@@ -32,26 +32,22 @@ pip install pyobjc-framework-Cocoa
 pip install pywin32 psutil win10toast
 ```
 
-### 2. Seed demo data (optional)
 
-```bash
-python seed.py
-```
 
-### 3. Start the API server
+### 2. Start the API server
 
 ```bash
 python api.py
 # → http://localhost:5000
 ```
 
-### 4. Start the tracker (separate terminal)
+### 3. Start the tracker (separate terminal)
 
 ```bash
 python tracker.py
 ```
 
-### 5. Open the dashboard
+### 4. Open the dashboard
 
 Place `digital-wellbeing.html` in the same folder and visit:
 ```
