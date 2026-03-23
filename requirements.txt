@@ -1,0 +1,14 @@
+# ── Core (all platforms) ──────────────────────────────────────────────────────
+flask>=3.0
+flask-cors>=4.0
+
+# ── Windows only ─────────────────────────────────────────────────────────────
+# pywin32>=306        # win32gui, win32process
+# psutil>=5.9         # process name lookup
+# win10toast>=0.9     # desktop notifications
+
+# ── macOS only ───────────────────────────────────────────────────────────────
+# pyobjc-framework-Cocoa>=10.0   # AppKit / NSWorkspace
+
+# ── Linux: xdotool installed via apt, no pip package needed ──────────────────
+# sudo apt install xdotool notify-send

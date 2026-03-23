@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wellbeing — Screen Time Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0c0c0f; --bg2: #141417; --bg3: #1c1c21; --bg4: #242428;
+  --border: rgba(255,255,255,.07); --border2: rgba(255,255,255,.12);
+  --text: #f0efe8; --text2: #8a8982; --text3: #4a4948;
+  --accent: #7ee8a2; --accent2: #5bc4f5; --warn: #f5a623;
+  --danger: #f06060; --purple: #b09ef8;
+  --mono: 'DM Mono', monospace; --sans: 'Sora', sans-serif;
+  --radius: 12px; --radius-lg: 18px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; overflow-x: hidden; }
+body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:.025; pointer-events:none; z-index:1000; }
+
+.app-shell { display:grid; grid-template-columns:220px 1fr; min-height:100vh; }
+
+.sidebar { background:var(--bg2); border-right:1px solid var(--border); padding:28px 0; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; }
+.logo { padding:0 24px 28px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+.logo-mark { display:flex; align-items:center; gap:10px; }
+.logo-icon { width:32px; height:32px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+.logo-text { font-size:15px; font-weight:600; letter-spacing:-.02em; }
+.logo-sub { font-size:10px; color:var(--text3); font-family:var(--mono); letter-spacing:.08em; text-transform:uppercase; margin-top:2px; }
+.nav { display:flex; flex-direction:column; gap:2px; padding:0 12px; flex:1; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; cursor:pointer; color:var(--text2); font-size:13px; font-weight:400; transition:all .15s; border:none; background:none; width:100%; text-align:left; }
+.nav-item:hover { background:var(--bg3); color:var(--text); }
+.nav-item.active { background:var(--bg4); color:var(--text); font-weight:500; }
+.nav-item.active .nav-dot { background:var(--accent); box-shadow:0 0 8px var(--accent); }
+.nav-icon { font-size:16px; width:20px; text-align:center; }
+.nav-dot { width:6px; height:6px; border-radius:50%; background:var(--text3); margin-left:auto; transition:all .2s; }
+.sidebar-footer { padding:16px 24px 0; border-top:1px solid var(--border); margin-top:auto; }
+.status-pill { display:flex; align-items:center; gap:8px; background:rgba(126,232,162,.08); border:1px solid rgba(126,232,162,.2); border-radius:20px; padding:7px 12px; font-size:11px; color:var(--accent); font-family:var(--mono); }
+.pulse { width:7px; height:7px; border-radius:50%; background:var(--accent); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+
+.main { display:flex; flex-direction:column; min-height:100vh; }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid var(--border); background:var(--bg); position:sticky; top:0; z-index:100; }
+.topbar-left h2 { font-size:20px; font-weight:600; letter-spacing:-.03em; }
+.topbar-left p { font-size:12px; color:var(--text2); margin-top:2px; font-family:var(--mono); }
+.topbar-right { display:flex; align-items:center; gap:10px; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid var(--border2); background:var(--bg3); color:var(--text); font-family:var(--sans); transition:all .15s; }
+.btn:hover { background:var(--bg4); }
+.btn-accent { background:var(--accent); color:#0c0c0f; border-color:transparent; font-weight:600; }
+.btn-accent:hover { background:#9ef5b8; }
+.content { padding:28px 32px; flex:1; }
+.section { display:none; animation:fadeIn .3s ease; }
+.section.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.metrics-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+.metric-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px 20px; position:relative; overflow:hidden; transition:border-color .2s; }
+.metric-card:hover { border-color:var(--border2); }
+.metric-card::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--card-accent,var(--accent)); opacity:.6; }
+.metric-label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:.08em; font-family:var(--mono); margin-bottom:10px; }
+.metric-value { font-size:28px; font-weight:600; letter-spacing:-.04em; line-height:1; margin-bottom:8px; }
+.metric-change { font-size:11px; font-family:var(--mono); }
+.metric-change.up { color:var(--danger); }
+.metric-change.down { color:var(--accent); }
+.metric-change.neutral { color:var(--text2); }
+.metric-icon { position:absolute; right:16px; top:16px; font-size:20px; opacity:.3; }
+
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.grid3 { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:16px; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:22px 24px; }
+.card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.card-title { font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:.1em; font-family:var(--mono); }
+.card-badge { font-size:10px; font-family:var(--mono); padding:3px 8px; border-radius:20px; background:var(--bg4); color:var(--text2); }
+
+.app-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.app-row:last-child { border-bottom:none; padding-bottom:0; }
+.app-row:first-child { padding-top:0; }
+.app-avatar { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; font-family:var(--mono); flex-shrink:0; }
+.app-meta { flex:1; min-width:0; }
+.app-name { font-size:13px; font-weight:500; margin-bottom:5px; }
+.app-bar-track { height:4px; background:var(--bg4); border-radius:2px; overflow:hidden; }
+.app-bar-fill { height:100%; border-radius:2px; transition:width .6s ease; }
+.app-right { text-align:right; flex-shrink:0; }
+.app-time { font-size:13px; font-family:var(--mono); font-weight:500; }
+.app-limit { font-size:10px; color:var(--text3); margin-top:2px; font-family:var(--mono); }
+.app-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+.alert-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); align-items:flex-start; }
+.alert-item:last-child { border-bottom:none; padding-bottom:0; }
+.alert-item:first-child { padding-top:0; }
+.alert-icon { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; margin-top:1px; }
+.alert-body { flex:1; }
+.alert-title { font-size:13px; font-weight:500; margin-bottom:3px; }
+.alert-time { font-size:11px; color:var(--text3); font-family:var(--mono); }
+
+.ring-wrap { display:flex; align-items:center; gap:24px; }
+.ring-canvas-wrap { position:relative; flex-shrink:0; }
+.ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.ring-center-value { font-size:20px; font-weight:600; letter-spacing:-.04em; }
+.ring-center-label { font-size:10px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; margin-top:2px; }
+.ring-legend { flex:1; }
+.legend-item { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; }
+.legend-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.legend-name { flex:1; color:var(--text2); }
+.legend-val { font-family:var(--mono); font-size:11px; }
+
+.heatmap-container { overflow-x:auto; }
+.heatmap-table { border-collapse:collapse; width:100%; }
+.hm-hour-label { font-size:10px; color:var(--text3); font-family:var(--mono); text-align:right; padding-right:10px; white-space:nowrap; width:40px; }
+.hm-day-head { font-size:10px; color:var(--text2); font-family:var(--mono); text-align:center; padding-bottom:8px; letter-spacing:.05em; text-transform:uppercase; }
+.hm-cell { width:36px; height:24px; border-radius:4px; cursor:pointer; transition:transform .1s; }
+.hm-cell:hover { transform:scale(1.2); }
+
+.limit-item { display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid var(--border); }
+.limit-item:last-child { border-bottom:none; }
+.limit-app-info { flex:1; min-width:0; }
+.limit-app-name { font-size:13px; font-weight:500; margin-bottom:4px; }
+.limit-app-today { font-size:11px; color:var(--text3); font-family:var(--mono); }
+.limit-controls { display:flex; align-items:center; gap:10px; }
+.limit-input { width:72px; padding:7px 10px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; color:var(--text); font-family:var(--mono); font-size:13px; text-align:center; outline:none; transition:border-color .2s; }
+.limit-input:focus { border-color:var(--accent); }
+.limit-input:disabled { opacity:.35; cursor:not-allowed; }
+.limit-unit { font-size:11px; color:var(--text3); font-family:var(--mono); }
+.toggle-switch { position:relative; width:36px; height:20px; cursor:pointer; }
+.toggle-switch input { opacity:0; width:0; height:0; position:absolute; }
+.toggle-track { position:absolute; inset:0; background:var(--bg4); border:1px solid var(--border2); border-radius:10px; transition:all .2s; }
+.toggle-switch input:checked ~ .toggle-track { background:rgba(126,232,162,.2); border-color:var(--accent); }
+.toggle-thumb { position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:var(--text3); transition:all .2s; }
+.toggle-switch input:checked ~ .toggle-thumb { left:19px; background:var(--accent); }
+.limit-pct { font-size:11px; font-family:var(--mono); width:44px; text-align:right; }
+
+.chart-wrap { position:relative; width:100%; height:260px; }
+.chart-wrap-sm { position:relative; width:100%; height:200px; }
+.week-stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+.week-stat { background:var(--bg3); border-radius:var(--radius); padding:14px 16px; text-align:center; }
+.week-stat-val { font-size:20px; font-weight:600; letter-spacing:-.03em; margin-bottom:4px; }
+.week-stat-label { font-size:10px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:.07em; }
+
+/* Empty state */
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; color:var(--text3); gap:12px; text-align:center; }
+.empty-state .icon { font-size:32px; opacity:.4; }
+.empty-state .msg { font-size:13px; line-height:1.6; }
+.empty-state .sub { font-size:11px; font-family:var(--mono); color:var(--text3); }
+
+/* Loading spinner */
+.spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; margin:auto; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-row { padding:20px; display:flex; justify-content:center; }
+
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--bg4); border-radius:3px; }
+
+.toast { position:fixed; bottom:24px; right:24px; background:var(--bg3); border:1px solid var(--accent); color:var(--accent); padding:12px 18px; border-radius:var(--radius); font-size:13px; font-family:var(--mono); z-index:9999; transform:translateY(60px); opacity:0; transition:all .3s cubic-bezier(.34,1.56,.64,1); }
+.toast.show { transform:translateY(0); opacity:1; }
+
+@media (max-width:1100px) { .metrics-row { grid-template-columns:repeat(2,1fr); } .grid2,.grid3 { grid-template-columns:1fr; } }
+@media (max-width:768px) { .app-shell { grid-template-columns:1fr; } .sidebar { display:none; } .content { padding:20px 16px; } .topbar { padding:16px; } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <div class="logo-icon">🌿</div>
+        <div>
+          <div class="logo-text">Wellbeing</div>
+          <div class="logo-sub">Screen Tracker</div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showSection('today')"><span class="nav-icon">⬡</span> Today<span class="nav-dot"></span></button>
+      <button class="nav-item" onclick="showSection('week')"><span class="nav-icon">◈</span> Weekly Report<span class="nav-dot"></span></button>
+      <button class="nav-item" onclick="showSection('limits')"><span class="nav-icon">◎</span> App Limits<span class="nav-dot"></span></button>
+      <button class="nav-item" onclick="showSection('heatmap')"><span class="nav-icon">▦</span> Heatmap<span class="nav-dot"></span></button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-pill"><div class="pulse"></div><span id="status-text">Connecting…</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h2 id="section-title">Today's Overview</h2>
+        <p id="section-date">Loading…</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn" onclick="refreshAll()">⟳ Refresh</button>
+        <button class="btn btn-accent" onclick="exportCSV()">↓ Export</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- TODAY -->
+      <div class="section active" id="sec-today">
+        <div class="metrics-row">
+          <div class="metric-card" style="--card-accent:var(--accent2)">
+            <span class="metric-icon">⏱</span>
+            <div class="metric-label">Screen Time</div>
+            <div class="metric-value" id="m-total">—</div>
+            <div class="metric-change neutral" id="m-apps">— apps tracked</div>
+          </div>
+          <div class="metric-card" style="--card-accent:var(--purple)">
+            <span class="metric-icon">⬡</span>
+            <div class="metric-label">Apps Used</div>
+            <div class="metric-value" id="m-appcount">—</div>
+            <div class="metric-change neutral">since midnight</div>
+          </div>
+          <div class="metric-card" style="--card-accent:var(--danger)">
+            <span class="metric-icon">⚠</span>
+            <div class="metric-label">Limits Exceeded</div>
+            <div class="metric-value" id="m-exceeded">—</div>
+            <div class="metric-change neutral" id="m-exceeded-apps">—</div>
+          </div>
+          <div class="metric-card" style="--card-accent:var(--accent)">
+            <span class="metric-icon">◈</span>
+            <div class="metric-label">Alerts Fired</div>
+            <div class="metric-value" id="m-alerts">—</div>
+            <div class="metric-change neutral">today</div>
+          </div>
+        </div>
+        <div class="grid3">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Top Apps</span><span class="card-badge">Today</span></div>
+            <div id="today-app-list"><div class="loading-row"><div class="spinner"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Breakdown</span><span class="card-badge">By app</span></div>
+            <div id="ring-container"><div class="loading-row"><div class="spinner"></div></div></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recent Alerts</span><span class="card-badge" id="alert-badge">today</span></div>
+            <div id="alerts-list"><div class="loading-row"><div class="spinner"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Hourly Activity</span><span class="card-badge">last 12h</span></div>
+            <div class="chart-wrap-sm"><canvas id="hourlyChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WEEKLY -->
+      <div class="section" id="sec-week">
+        <div class="week-stat-grid">
+          <div class="week-stat"><div class="week-stat-val" id="w-total">—</div><div class="week-stat-label">Total this week</div></div>
+          <div class="week-stat"><div class="week-stat-val" id="w-avg" style="color:var(--warn)">—</div><div class="week-stat-label">Daily average</div></div>
+          <div class="week-stat"><div class="week-stat-val" id="w-topapp" style="color:var(--accent)">—</div><div class="week-stat-label">Most used app</div></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header"><span class="card-title">Daily Screen Time</span><span class="card-badge">This week</span></div>
+          <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">App Totals</span><span class="card-badge">7 days</span></div>
+            <div id="week-app-list"><div class="loading-row"><div class="spinner"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Day Comparison</span><span class="card-badge">By day</span></div>
+            <div class="chart-wrap-sm"><canvas id="dayChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIMITS -->
+      <div class="section" id="sec-limits">
+        <div class="card">
+          <div class="card-header"><span class="card-title">App Time Limits</span><span class="card-badge">alerts at 80% + 100%</span></div>
+          <div id="limits-list"><div class="loading-row"><div class="spinner"></div></div></div>
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <button class="btn btn-accent" onclick="saveLimits()">✓ Save All Limits</button>
+            <button class="btn" onclick="loadLimits()">↺ Reload</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- HEATMAP -->
+      <div class="section" id="sec-heatmap">
+        <div class="metrics-row" style="grid-template-columns:repeat(3,1fr)">
+          <div class="metric-card" style="--card-accent:var(--accent2)"><div class="metric-label">Peak hour</div><div class="metric-value" id="hm-peak" style="font-size:22px">—</div><div class="metric-change neutral">most active</div></div>
+          <div class="metric-card" style="--card-accent:var(--accent)"><div class="metric-label">Quietest day</div><div class="metric-value" id="hm-quiet" style="font-size:22px">—</div><div class="metric-change down">least usage</div></div>
+          <div class="metric-card" style="--card-accent:var(--purple)"><div class="metric-label">Days tracked</div><div class="metric-value" id="hm-days" style="font-size:22px">—</div><div class="metric-change neutral">with data</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Usage Heatmap</span><span class="card-badge">last 7 days · by hour</span></div>
+          <div class="heatmap-container"><div id="heatmap-grid"><div class="loading-row"><div class="spinner"></div></div></div></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:14px;font-size:10px;color:var(--text3);font-family:var(--mono)">
+            <span>Low</span>
+            <div id="hm-legend-scale" style="display:flex;gap:3px"></div>
+            <span>High</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:5000/api';
+
+// ── Palette for app colours (assigned dynamically) ───────────────────────────
+const PALETTE = ['#5bc4f5','#7ee8a2','#f08abf','#b09ef8','#f5a623','#f06060','#8a8982','#5DCAA5','#EF9F27','#D4537E'];
+const appColor = {};
+let colorIdx = 0;
+function getColor(name) {
+  if (!appColor[name]) appColor[name] = PALETTE[colorIdx++ % PALETTE.length];
+  return appColor[name];
+}
+function hexBg(hex, a=0.15) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ── Format helpers ────────────────────────────────────────────────────────────
+function fmt(mins) {
+  if (mins < 1) return '0m';
+  if (mins < 60) return Math.round(mins) + 'm';
+  return Math.floor(mins/60) + 'h ' + String(Math.round(mins%60)).padStart(2,'0') + 'm';
+}
+function fmtSecs(secs) { return fmt(secs/60); }
+function abbr(name) { return name.slice(0,2).toUpperCase(); }
+function fmtHour(h) { return h === 12 ? '12pm' : h < 12 ? h+'am' : (h-12)+'pm'; }
+function today() { return new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+let ringChart, hourlyChart, weekChart, dayChart;
+const CHART_OPTS = {
+  tooltip: { backgroundColor:'#1c1c21', titleColor:'#f0efe8', bodyColor:'#8a8982', borderColor:'rgba(255,255,255,.1)', borderWidth:1 },
+  grid: 'rgba(255,255,255,.04)',
+  tick: '#4a4948',
+};
+
+// ── Empty state helper ────────────────────────────────────────────────────────
+function emptyState(msg, sub='tracker.py must be running') {
+  return `<div class="empty-state">
+    <div class="icon">◎</div>
+    <div class="msg">${msg}</div>
+    <div class="sub">${sub}</div>
+  </div>`;
+}
+
+// ── Fetch wrapper ─────────────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TODAY
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function loadToday() {
+  try {
+    const [apps, stats, alerts] = await Promise.all([
+      apiFetch('/today'),
+      apiFetch('/stats'),
+      apiFetch('/alerts'),
+    ]);
+
+    // Metric cards
+    document.getElementById('m-total').textContent     = stats.today.formatted || '0m';
+    document.getElementById('m-appcount').textContent  = stats.today.apps_used;
+    document.getElementById('m-exceeded').textContent  = stats.today.limits_exceeded;
+    document.getElementById('m-exceeded-apps').textContent = stats.today.exceeded_apps.join(', ') || 'none';
+    document.getElementById('m-alerts').textContent    = stats.today.alerts_fired;
+    document.getElementById('status-text').textContent = 'Tracking active';
+    document.getElementById('section-date').textContent = today() + ' · just now';
+
+    renderTodayApps(apps);
+    renderRingChart(apps);
+    renderAlerts(alerts);
+    renderHourlyChart();
+  } catch(e) {
+    console.error('loadToday:', e);
+    document.getElementById('status-text').textContent = 'API offline';
+    document.getElementById('today-app-list').innerHTML = emptyState('No data yet — is tracker.py running?');
+    document.getElementById('ring-container').innerHTML = emptyState('No apps tracked yet');
+    document.getElementById('alerts-list').innerHTML    = emptyState('No alerts today', 'Set limits to get alerts');
+  }
+}
+
+function renderTodayApps(apps) {
+  const el = document.getElementById('today-app-list');
+  if (!apps.length) { el.innerHTML = emptyState('No apps tracked yet','Start tracker.py to begin'); return; }
+  const maxMins = apps[0].minutes;
+  el.innerHTML = apps.slice(0,8).map(a => {
+    const color = getColor(a.app_name);
+    const over  = a.over_limit;
+    const bar   = over ? '#f06060' : color;
+    const pct   = a.limit_mins > 0 ? Math.min(100, a.pct) : Math.min(100, Math.round(a.minutes/maxMins*100));
+    const dot   = a.limit_mins > 0 ? (over ? '#f06060' : '#7ee8a2') : '#4a4948';
+    return `<div class="app-row">
+      <div class="app-avatar" style="background:${hexBg(color)};color:${color}">${abbr(a.app_name)}</div>
+      <div class="app-meta">
+        <div class="app-name">${a.app_name}</div>
+        <div class="app-bar-track"><div class="app-bar-fill" style="width:${pct}%;background:${bar}"></div></div>
+      </div>
+      <div class="app-right">
+        <div class="app-time">${a.formatted}</div>
+        <div class="app-limit">${a.limit_mins > 0 ? 'lim '+fmt(a.limit_mins) : 'no limit'}</div>
+      </div>
+      <div class="app-status" style="background:${dot}"></div>
+    </div>`;
+  }).join('');
+}
+
+function renderRingChart(apps) {
+  const el = document.getElementById('ring-container');
+  if (!apps.length) { el.innerHTML = emptyState('No data','waiting for tracker'); return; }
+  el.innerHTML = `<div class="ring-wrap"><div class="ring-canvas-wrap"><canvas id="ringChart" width="140" height="140"></canvas><div class="ring-center"><div class="ring-center-value" id="ring-val">—</div><div class="ring-center-label">total</div></div></div><div class="ring-legend" id="ring-legend"></div></div>`;
+
+  const top5   = apps.slice(0,5);
+  const others = apps.slice(5).reduce((s,a) => s+a.minutes, 0);
+  const labels = top5.map(a=>a.app_name).concat(others > 0 ? ['Other'] : []);
+  const data   = top5.map(a=>a.minutes).concat(others > 0 ? [others] : []);
+  const colors = labels.map((l,i) => i < top5.length ? getColor(l) : '#4a4948');
+  const totalMins = data.reduce((s,v)=>s+v,0);
+
+  document.getElementById('ring-val').textContent = fmt(totalMins);
+
+  if (ringChart) ringChart.destroy();
+  ringChart = new Chart(document.getElementById('ringChart'), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:colors, borderWidth:0, hoverOffset:4 }] },
+    options:{ cutout:'72%', responsive:false, plugins:{ legend:{display:false}, tooltip:{ ...CHART_OPTS.tooltip, callbacks:{ label: c=>' '+c.label+': '+fmt(c.raw) } } } }
+  });
+  document.getElementById('ring-legend').innerHTML = labels.map((l,i)=>`
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${colors[i]}"></div>
+      <span class="legend-name">${l}</span>
+      <span class="legend-val">${fmt(data[i])}</span>
+    </div>`).join('');
+}
+
+function renderAlerts(alerts) {
+  const el = document.getElementById('alerts-list');
+  document.getElementById('alert-badge').textContent = alerts.length + ' today';
+  if (!alerts.length) { el.innerHTML = emptyState('No alerts today','Set limits to receive alerts'); return; }
+  const colorMap = { exceeded:'var(--danger)', warn:'var(--warn)' };
+  const bgMap    = { exceeded:'rgba(240,96,96,.12)', warn:'rgba(245,166,35,.12)' };
+  const iconMap  = { exceeded:'⚠', warn:'◎' };
+  el.innerHTML = alerts.map(a=>`
+    <div class="alert-item">
+      <div class="alert-icon" style="background:${bgMap[a.level]||bgMap.warn};color:${colorMap[a.level]||colorMap.warn}">${iconMap[a.level]||'◎'}</div>
+      <div class="alert-body">
+        <div class="alert-title">${a.app_name} — ${a.level === 'exceeded' ? 'limit exceeded' : '80% warning'}</div>
+        <div class="alert-time">${a.fired_at}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function renderHourlyChart() {
+  const ctx = document.getElementById('hourlyChart');
+  if (!ctx) return;
+
+  let rows = [];
+  try {
+    rows = await apiFetch('/hourly');
+  } catch(e) {
+    if (hourlyChart) hourlyChart.destroy();
+    return;
+  }
+
+  // Only show hours 6am–current hour (trim leading and trailing zeros)
+  const nowHour    = new Date().getHours();
+  const active     = rows.filter(r => r.hour >= 6 && r.hour <= nowHour);
+  const labels     = active.map(r => r.label);
+  const data       = active.map(r => Math.round(r.minutes));
+  const maxMins    = Math.max(...data, 1);
+
+  if (hourlyChart) hourlyChart.destroy();
+  hourlyChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: data.map(v => {
+          const ratio = v / maxMins;
+          return ratio > 0.7 ? 'rgba(240,96,96,.75)'
+               : ratio > 0.4 ? 'rgba(245,166,35,.75)'
+               :                'rgba(91,196,245,.55)';
+        }),
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...CHART_OPTS.tooltip,
+          callbacks: { label: c => ` ${c.raw} min active` }
+        }
+      },
+      scales: {
+        x: { ticks: { color: CHART_OPTS.tick, font: { size: 10, family: "'DM Mono'" } }, grid: { display: false } },
+        y: { display: false, min: 0 }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WEEKLY
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function loadWeekly() {
+  try {
+    const [weekly, totals] = await Promise.all([
+      apiFetch('/weekly'),
+      apiFetch('/daily-totals'),
+    ]);
+
+    // Compute week stats
+    const totalSecs  = totals.reduce((s,r)=>s+r.total_seconds,0);
+    const avgSecs    = totals.length ? totalSecs/totals.length : 0;
+
+    // Top app across the week
+    const appTotals = {};
+    weekly.forEach(r => { appTotals[r.app_name] = (appTotals[r.app_name]||0) + r.minutes; });
+    const topApp = Object.entries(appTotals).sort((a,b)=>b[1]-a[1])[0];
+
+    document.getElementById('w-total').textContent = fmt(totalSecs/60);
+    document.getElementById('w-avg').textContent   = fmt(avgSecs/60);
+    document.getElementById('w-topapp').textContent = topApp ? topApp[0] : '—';
+
+    renderWeekChart(weekly, totals);
+    renderWeekApps(appTotals);
+    renderDayChart(totals);
+  } catch(e) {
+    console.error('loadWeekly:', e);
+    document.getElementById('week-app-list').innerHTML = emptyState('No weekly data yet','Keep tracker running for a few days');
+  }
+}
+
+function renderWeekChart(weekly, totals) {
+  // Build per-app-per-day structure for stacked bars
+  const days    = totals.map(r => r.date);
+  const dayLabels = days.map(d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'}));
+
+  // Top 4 apps by total
+  const appTotals = {};
+  weekly.forEach(r => { appTotals[r.app_name] = (appTotals[r.app_name]||0) + r.minutes; });
+  const top4 = Object.entries(appTotals).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]);
+
+  const datasets = top4.map(app => ({
+    label: app,
+    data: days.map(d => {
+      const row = weekly.find(r=>r.app_name===app && r.date===d);
+      return row ? Math.round(row.minutes) : 0;
+    }),
+    backgroundColor: hexBg(getColor(app), 0.75),
+    stack:'s',
+    borderRadius: 0,
+  }));
+
+  // "Other" dataset
+  const otherData = days.map(d => {
+    const topSum = top4.reduce((s,app)=>{ const r=weekly.find(x=>x.app_name===app&&x.date===d); return s+(r?r.minutes:0); },0);
+    const dayTotal = totals.find(r=>r.date===d);
+    return dayTotal ? Math.max(0, Math.round(dayTotal.total_minutes - topSum)) : 0;
+  });
+  if (otherData.some(v=>v>0)) {
+    datasets.push({ label:'Other', data:otherData, backgroundColor:'rgba(138,137,130,.45)', stack:'s', borderRadius:{ topLeft:4,topRight:4,bottomLeft:0,bottomRight:0 } });
+  }
+
+  const ctx = document.getElementById('weekChart');
+  if (weekChart) weekChart.destroy();
+  weekChart = new Chart(ctx, {
+    type:'bar', data:{ labels:dayLabels, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, labels:{ color:'#8a8982', font:{size:11,family:"'DM Mono'"}, boxWidth:10, boxHeight:10, useBorderRadius:true, borderRadius:2, padding:16 } },
+        tooltip:{ ...CHART_OPTS.tooltip, callbacks:{ label: c=>` ${c.dataset.label}: ${fmt(c.raw)}` } }
+      },
+      scales:{
+        x:{ stacked:true, ticks:{color:'#8a8982',font:{size:12,family:"'DM Mono'"}}, grid:{display:false} },
+        y:{ stacked:true, ticks:{color:CHART_OPTS.tick, font:{size:10,family:"'DM Mono'"}, callback:v=>Math.floor(v/60)+'h'}, grid:{color:CHART_OPTS.grid} }
+      }
+    }
+  });
+}
+
+function renderWeekApps(appTotals) {
+  const el   = document.getElementById('week-app-list');
+  const list = Object.entries(appTotals).sort((a,b)=>b[1]-a[1]);
+  if (!list.length) { el.innerHTML = emptyState('No weekly data yet'); return; }
+  const max = list[0][1];
+  el.innerHTML = list.map(([name, mins]) => {
+    const color = getColor(name);
+    return `<div class="app-row">
+      <div class="app-avatar" style="background:${hexBg(color)};color:${color}">${abbr(name)}</div>
+      <div class="app-meta">
+        <div class="app-name">${name}</div>
+        <div class="app-bar-track"><div class="app-bar-fill" style="width:${Math.round(mins/max*100)}%;background:${color}"></div></div>
+      </div>
+      <div class="app-right"><div class="app-time">${fmt(mins)}</div><div class="app-limit">this week</div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderDayChart(totals) {
+  const ctx = document.getElementById('dayChart');
+  if (dayChart) dayChart.destroy();
+  if (!totals.length) return;
+  dayChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: totals.map(r=>new Date(r.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})),
+      datasets:[{ data:totals.map(r=>r.total_minutes), borderColor:'#7ee8a2', backgroundColor:'rgba(126,232,162,.08)', fill:true, tension:.4, pointBackgroundColor:'#7ee8a2', pointRadius:4, pointHoverRadius:6 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ ...CHART_OPTS.tooltip, callbacks:{label:c=>` ${fmt(c.raw)}`} } },
+      scales:{
+        x:{ ticks:{color:'#8a8982',font:{size:11,family:"'DM Mono'"}}, grid:{display:false} },
+        y:{ ticks:{color:CHART_OPTS.tick,font:{size:10,family:"'DM Mono'"},callback:v=>Math.floor(v/60)+'h'}, grid:{color:CHART_OPTS.grid} }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIMITS
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _todayApps = [];
+
+async function loadLimits() {
+  try {
+    const [limits, todayApps] = await Promise.all([ apiFetch('/limits'), apiFetch('/today') ]);
+    _todayApps = todayApps;
+
+    // Merge: show limits for all tracked apps + any existing limits
+    const tracked = todayApps.map(a => a.app_name);
+    const limitMap = {};
+    limits.forEach(l => { limitMap[l.app_name] = l; });
+    tracked.forEach(name => { if (!limitMap[name]) limitMap[name] = { app_name:name, limit_mins:0, enabled:false }; });
+
+    const allApps = Object.values(limitMap).sort((a,b)=>a.app_name.localeCompare(b.app_name));
+    if (!allApps.length) {
+      document.getElementById('limits-list').innerHTML = emptyState('No apps tracked yet','Start tracker.py first');
+      return;
+    }
+    renderLimits(allApps, todayApps);
+  } catch(e) {
+    document.getElementById('limits-list').innerHTML = emptyState('Could not load limits','Is api.py running?');
+  }
+}
+
+function renderLimits(limits, todayApps) {
+  const el = document.getElementById('limits-list');
+  el.innerHTML = limits.map((l,i) => {
+    const todayRow = todayApps.find(a=>a.app_name===l.app_name);
+    const usedMins = todayRow ? todayRow.minutes : 0;
+    const pct      = l.limit_mins > 0 ? Math.round(usedMins/l.limit_mins*100) : 0;
+    const over     = pct > 100;
+    const pctColor = over ? 'var(--danger)' : pct > 80 ? 'var(--warn)' : 'var(--accent)';
+    const color    = getColor(l.app_name);
+    return `<div class="limit-item">
+      <div class="app-avatar" style="background:${hexBg(color)};color:${color};width:34px;height:34px;border-radius:9px;flex-shrink:0">${abbr(l.app_name)}</div>
+      <div class="limit-app-info">
+        <div class="limit-app-name">${l.app_name}</div>
+        <div class="limit-app-today">Today: ${fmt(usedMins)}</div>
+      </div>
+      <div class="limit-controls">
+        <div style="display:flex;align-items:center;gap:6px">
+          <input class="limit-input" type="number" min="0" max="480" value="${l.limit_mins}" id="li-${i}" ${!l.enabled?'disabled':''}>
+          <span class="limit-unit">min</span>
+        </div>
+        <span class="limit-pct" style="color:${l.limit_mins>0?pctColor:'var(--text3)'}">
+          ${l.limit_mins>0 ? pct+'%' : '—'}
+        </span>
+        <label class="toggle-switch">
+          <input type="checkbox" ${l.enabled?'checked':''} onchange="toggleLimitRow(${i},this.checked)">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+  window._limitApps = limits;
+}
+
+function toggleLimitRow(i, checked) {
+  const inp = document.getElementById('li-'+i);
+  if (inp) inp.disabled = !checked;
+}
+
+async function saveLimits() {
+  if (!window._limitApps) return;
+  const payload = window._limitApps.map((l,i) => {
+    const inp = document.getElementById('li-'+i);
+    const enabled = document.querySelector(`#limits-list .limit-item:nth-child(${i+1}) input[type=checkbox]`);
+    return {
+      app_name  : l.app_name,
+      limit_mins: inp ? parseInt(inp.value)||0 : l.limit_mins,
+      enabled   : enabled ? enabled.checked : l.enabled,
+    };
+  });
+  try {
+    await fetch(API+'/limits', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    toast('✓ Limits saved');
+    loadLimits();
+  } catch(e) {
+    toast('✗ Save failed — is api.py running?');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HEATMAP
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function loadHeatmap() {
+  try {
+    const grid = await apiFetch('/heatmap?days=7');
+    renderHeatmap(grid);
+  } catch(e) {
+    document.getElementById('heatmap-grid').innerHTML = emptyState('No heatmap data yet','Keep tracker running for a few days');
+  }
+}
+
+function renderHeatmap(grid) {
+  const maxMins = Math.max(...grid.map(c=>c.minutes), 1);
+  const scale   = v => {
+    const stops = ['#0c0c0f','#0C447C','#185FA5','#378ADD','#85B7EB','#5bc4f5','#a8e6ff'];
+    return stops[Math.min(stops.length-1, Math.floor((v/maxMins)*stops.length))];
+  };
+
+  // Legend
+  const ls = document.getElementById('hm-legend-scale');
+  ls.innerHTML = [0,.2,.4,.6,.8,1].map(v=>`<div style="width:18px;height:10px;border-radius:2px;background:${scale(v*maxMins)}"></div>`).join('');
+
+  const days  = [...new Set(grid.map(c=>c.date))].sort();
+  const hours = [...new Set(grid.map(c=>c.hour))].sort((a,b)=>a-b);
+
+  const dayLabels = days.map(d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'}));
+
+  // Peak hour & quietest day
+  const hourTotals = {};
+  const dayTotals  = {};
+  grid.forEach(c => {
+    hourTotals[c.hour] = (hourTotals[c.hour]||0) + c.minutes;
+    dayTotals[c.date]  = (dayTotals[c.date]||0)  + c.minutes;
+  });
+  const peakHour   = Object.entries(hourTotals).sort((a,b)=>b[1]-a[1])[0];
+  const quietDay   = Object.entries(dayTotals).sort((a,b)=>a[1]-b[1])[0];
+
+  document.getElementById('hm-peak').textContent  = peakHour  ? fmtHour(+peakHour[0])  : '—';
+  document.getElementById('hm-quiet').textContent = quietDay  ? new Date(quietDay[0]+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'}) : '—';
+  document.getElementById('hm-days').textContent  = days.length;
+
+  let html = `<table class="heatmap-table"><thead><tr><th></th>${dayLabels.map(d=>`<th class="hm-day-head">${d}</th>`).join('')}</tr></thead><tbody>`;
+  hours.forEach(h => {
+    html += `<tr><td class="hm-hour-label">${fmtHour(h)}</td>`;
+    days.forEach(d => {
+      const cell = grid.find(c=>c.date===d&&c.hour===h);
+      const mins = cell ? cell.minutes : 0;
+      html += `<td style="padding:2px"><div class="hm-cell" style="background:${scale(mins)}" title="${fmtHour(h)} ${d}: ${Math.round(mins)}min"></div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('heatmap-grid').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NAV & REFRESH
+// ══════════════════════════════════════════════════════════════════════════════
+
+const TITLES = {
+  today : ["Today's Overview",   () => today() + ' · live'],
+  week  : ["Weekly Report",      () => 'Last 7 days'],
+  limits: ["App Time Limits",    () => 'Set daily caps and alert thresholds'],
+  heatmap:["Usage Heatmap",      () => 'Hourly activity across the last 7 days'],
+};
+
+function showSection(name) {
+  document.querySelectorAll('.nav-item').forEach((b,i) => {
+    b.classList.toggle('active', ['today','week','limits','heatmap'][i] === name);
+  });
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  document.getElementById('section-title').textContent = TITLES[name][0];
+  document.getElementById('section-date').textContent  = TITLES[name][1]();
+  if (name==='week')    loadWeekly();
+  if (name==='limits')  loadLimits();
+  if (name==='heatmap') loadHeatmap();
+}
+
+async function refreshAll() {
+  const active = document.querySelector('.nav-item.active');
+  const names  = ['today','week','limits','heatmap'];
+  const idx    = [...document.querySelectorAll('.nav-item')].indexOf(active);
+  const name   = names[idx] || 'today';
+  if (name==='today')   await loadToday();
+  if (name==='week')    await loadWeekly();
+  if (name==='limits')  await loadLimits();
+  if (name==='heatmap') await loadHeatmap();
+  toast('⟳ Refreshed');
+}
+
+async function exportCSV() {
+  try {
+    const apps = await apiFetch('/today');
+    const rows = [['App','Minutes','Limit (min)','% Used','Over Limit']];
+    apps.forEach(a => rows.push([a.app_name, a.minutes, a.limit_mins||'', a.pct, a.over_limit]));
+    const csv  = rows.map(r=>r.join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {href:url, download:'wellbeing-'+new Date().toISOString().slice(0,10)+'.csv'});
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('↓ Exported CSV');
+  } catch(e) { toast('✗ Export failed'); }
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2500);
+}
+
+// ── Browser push notifications ────────────────────────────────────────────────
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') toast('✓ Browser notifications enabled');
+  }
+}
+
+function fireNotification(title, body, level) {
+  // In-page toast (always works)
+  const icon = level === 'exceeded' ? '⚠' : '◎';
+  toast(`${icon} ${title}`);
+
+  // Native browser notification (requires permission)
+  if (Notification.permission === 'granted') {
+    const n = new Notification(title, {
+      body,
+      icon: level === 'exceeded'
+        ? 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28">⚠️</text></svg>'
+        : 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28">⏱️</text></svg>',
+      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28">🌿</text></svg>',
+      tag: `wellbeing-${title}`,   // deduplicates — same tag replaces previous
+      requireInteraction: level === 'exceeded',  // stays until dismissed if exceeded
+    });
+    // Auto-close warnings after 8s; exceeded alerts stay until user dismisses
+    if (level !== 'exceeded') setTimeout(() => n.close(), 8000);
+    n.onclick = () => { window.focus(); n.close(); };
+  }
+}
+
+// ── SSE alert stream ──────────────────────────────────────────────────────────
+
+function connectAlertStream() {
+  if (!window.EventSource) {
+    console.warn('SSE not supported — falling back to polling');
+    return;
+  }
+
+  const es = new EventSource(`${API}/alerts/stream`);
+
+  es.onopen = () => {
+    document.getElementById('status-text').textContent = 'Tracking active';
+  };
+
+  es.onmessage = (event) => {
+    try {
+      const alert = JSON.parse(event.data);
+      fireNotification(alert.title, alert.body, alert.level);
+
+      // Refresh the alerts list if Today tab is visible
+      const todayActive = document.getElementById('sec-today').classList.contains('active');
+      if (todayActive) loadToday();
+    } catch(e) {
+      console.error('SSE parse error:', e);
+    }
+  };
+
+  es.onerror = () => {
+    document.getElementById('status-text').textContent = 'Reconnecting…';
+    // EventSource auto-reconnects — no manual retry needed
+  };
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+requestNotificationPermission();
+connectAlertStream();
+loadToday();
+
+// Auto-refresh today's data every 15 seconds
+setInterval(() => {
+  const active = document.querySelector('.section.active');
+  if (active && active.id === 'sec-today') loadToday();
+}, 15000);
+</script>
+</body>
+</html>
