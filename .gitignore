@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+wellbeing.db
+wellbeing.db-journal
+wellbeing.db-wal
+wellbeing.db-shm
+.wellbeing-runtime/
+.architectiq/

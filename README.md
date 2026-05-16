@@ -20,7 +20,7 @@ wellbeing/
 ### 1. Install dependencies
 
 ```bash
-pip install flask flask-cors
+pip install flask
 
 # Linux
 sudo apt install xdotool libnotify-bin
@@ -32,22 +32,26 @@ pip install pyobjc-framework-Cocoa
 pip install pywin32 psutil win10toast
 ```
 
+### 2. Seed demo data (optional)
 
+```bash
+python seed.py
+```
 
-### 2. Start the API server
+### 3. Start the API server
 
 ```bash
 python api.py
 # → http://localhost:5000
 ```
 
-### 3. Start the tracker (separate terminal)
+### 4. Start the tracker (separate terminal)
 
 ```bash
 python tracker.py
 ```
 
-### 4. Open the dashboard
+### 5. Open the dashboard
 
 Place `digital-wellbeing.html` in the same folder and visit:
 ```
@@ -55,6 +59,25 @@ http://localhost:5000
 ```
 
 ---
+
+## Background Mode
+
+Use the supervisor when you want the app to keep running after the editor or
+terminal is closed:
+
+```bash
+python wellbeing_service.py start
+python wellbeing_service.py status
+python wellbeing_service.py stop
+```
+
+`start` launches both `api.py` and `tracker.py` in the background and restarts
+them if either process exits. `stop` is the explicit way to shut them down.
+Logs are written under `.wellbeing-runtime/`.
+
+When an enabled app limit reaches 100%, the tracker closes that foreground app.
+If you raise the limit, disable the limit, or set the limit to `0`, the app is
+allowed again the next time it is opened.
 
 ## API Reference
 

@@ -170,6 +170,27 @@ def get_all_limits() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_limit_status(app_name: str) -> dict:
+    """Return today's usage and limit settings for one app."""
+    today = date.today().isoformat()
+    with get_connection() as con:
+        row = con.execute("""
+            SELECT
+                COALESCE(u.seconds, 0) AS seconds,
+                l.limit_mins,
+                l.enabled
+            FROM limits l
+            LEFT JOIN usage u
+                ON u.app_name = l.app_name AND u.date = ?
+            WHERE l.app_name = ?
+            LIMIT 1
+        """, (today, app_name)).fetchone()
+
+    if row is None:
+        return {"seconds": 0, "limit_mins": None, "enabled": False}
+    return dict(row)
+
+
 def upsert_limit(app_name: str, limit_mins: int, enabled: bool):
     """Insert or update a limit row."""
     from datetime import datetime
